@@ -11,8 +11,8 @@
   --tx:#d0d0c8;--txd:#787870;--ac:#50a0e6;--gr:#32c878;--rd:#d85a30;
   --r:12px;
 }
-html,body{height:100%;background:#12121a;color:var(--tx);font-family:system-ui,sans-serif;overflow:hidden}
-#app{display:flex;flex-direction:column;height:100%;max-width:600px;margin:0 auto;position:relative}
+html,body{height:100%;width:100%;max-width:100vw;background:#12121a;color:var(--tx);font-family:system-ui,sans-serif;overflow:hidden}
+#app{display:flex;flex-direction:column;height:100%;width:100%;max-width:600px;margin:0 auto;position:relative;overflow:hidden}
 
 /* header */
 #hdr{
@@ -24,6 +24,9 @@ html,body{height:100%;background:#12121a;color:var(--tx);font-family:system-ui,s
 #genbox{text-align:right}
 #genbox .gn{font-size:22px;font-weight:700;color:var(--ac)}
 #genbox .gl{font-size:11px;color:var(--txd)}
+
+/* body row (wheel + controls) */
+#body-row{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0}
 
 /* canvas area */
 #cvwrap{flex:1;position:relative;overflow:hidden;min-height:0}
@@ -70,12 +73,12 @@ canvas{display:block;width:100%;height:100%}
 .tab.active{border-bottom-color:var(--ac);color:var(--ac)}
 
 /* tab panels */
-#panels{flex-shrink:0;max-height:42vh;overflow-y:auto;background:var(--bg2)}
-.panel{display:none;padding:12px}
+#panels{flex-shrink:0;max-height:42vh;overflow-y:auto;overflow-x:hidden;background:var(--bg2);width:100%}
+.panel{display:none;padding:12px;width:100%;overflow:hidden}
 .panel.active{display:block}
 
 /* charts panel */
-#chart-canvas{width:100%;height:200px;display:block}
+#chart-canvas{width:100%;max-width:100%;height:200px;display:block}
 
 /* params panel */
 .section{margin-bottom:14px}
@@ -145,6 +148,18 @@ select{
 #legend.show{display:block}
 .leg-row{display:flex;align-items:center;gap:7px;margin-bottom:4px}
 .leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+/* ── landscape layout: wheel left, controls right ── */
+@media (orientation:landscape) and (max-height:620px) {
+  #app{max-width:100vw}
+  #body-row{flex-direction:row}
+  #cvwrap{flex:0 0 44%;min-width:0}
+  #right-col{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;overflow:hidden;border-left:1px solid var(--bd)}
+  #actbar{border-top:none}
+  #panels{flex:1;max-height:none;overflow-y:auto}
+  /* keep stat chips on screen even in the narrow wheel column */
+  #overlay{flex-wrap:wrap}
+}
 </style>
 </head>
 <body>
@@ -160,6 +175,7 @@ select{
     </div>
   </div>
 
+  <div id="body-row">
   <div id="cvwrap">
     <canvas id="cv"></canvas>
     <div id="overlay">
@@ -170,6 +186,7 @@ select{
     <div id="legend"></div>
   </div>
 
+  <div id="right-col">
   <div id="actbar">
     <button class="btn" id="btn-step">Шаг</button>
     <button class="btn primary" id="btn-run">▶ Запуск</button>
@@ -268,6 +285,8 @@ select{
       <div id="pop-grid"></div>
     </div>
   </div>
+  </div><!-- #right-col -->
+  </div><!-- #body-row -->
 </div>
 
 <script>
@@ -570,21 +589,32 @@ function drawFrame() {
 
 function drawCharts() {
   const dpr=window.devicePixelRatio||1;
+  // Clear the inline px width so the canvas reflows to its CSS width:100%
+  // before measuring — otherwise it stays locked at a previous size.
+  chartCv.style.width='';
   const W=chartCv.clientWidth;
   if (!W) return; // panel hidden — skip to avoid zeroing the canvas buffer
-  const H=200;
+  // In landscape the panel is tall — grow the canvas to fill the space.
+  let H=200;
+  if (window.matchMedia('(orientation:landscape) and (max-height:620px)').matches) {
+    const panelH=document.getElementById('panels').clientHeight;
+    if (panelH) H=Math.max(200, panelH-24); // 24 = panel padding (top+bottom)
+  }
   chartCv.width=W*dpr; chartCv.height=H*dpr;
   chartCv.style.width=W+'px'; chartCv.style.height=H+'px';
-  chartCtx.scale(dpr,dpr);
+  chartCtx.setTransform(1,0,0,1,0,0); chartCtx.scale(dpr,dpr);
 
   chartCtx.fillStyle='#1c1c24';
   chartCtx.fillRect(0,0,W,H);
 
   const hist=sim.popHistory, coop=sim.coopHistory;
-  // Layout: PAD(8) | H1=86 strat chart | leg=12 | gap=4 | title=12 | H2=62 coop chart | leg=12 | PAD(4)
+  // Layout: PAD(8) | H1 strat chart | leg=12 | gap=4 | title=12 | H2 coop chart | leg=12 | PAD(4)
+  // Chrome (pads/legends/titles) ≈ 58px; the rest is split between the two charts.
   const PAD=8, LABEL_W=26;
   const GW = W - PAD*2 - LABEL_W; // line drawing width (leave right margin for count labels)
-  const H1=86, LEG=12, GAP=4, TITLE=12, H2=60;
+  const LEG=12, GAP=4, TITLE=12;
+  const chartSpace=Math.max(120, H-58);
+  const H1=Math.round(chartSpace*0.59), H2=chartSpace-H1;
   const CY1=PAD;           // strategy chart top
   const CY_LEG=CY1+H1+2;  // strategy legend
   const CY2=CY_LEG+LEG+GAP+TITLE; // coop chart top  (= 8+86+2+12+4+12 = 124)
@@ -835,7 +865,14 @@ document.querySelectorAll('.tab').forEach(tab=>{
 });
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
-window.addEventListener('resize',resizeCanvas);
+window.addEventListener('resize',()=>{ resizeCanvas(); drawCharts(); });
+// Redraw charts whenever the panel area actually changes size (orientation
+// flips, layout reflow) so the canvas always fills its container.
+if (window.ResizeObserver) {
+  new ResizeObserver(()=>{
+    if (document.querySelector('.tab[data-tab="charts"].active')) drawCharts();
+  }).observe(document.getElementById('panels'));
+}
 resizeCanvas();
 updateStats();
 buildPopGrid();
