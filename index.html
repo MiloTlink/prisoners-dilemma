@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Дилемма Заключённого</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#12121600;--bg2:#1c1c24;--bg3:#24242e;--bd:#3a3a4a;
+  --tx:#d0d0c8;--txd:#787870;--ac:#50a0e6;--gr:#32c878;--rd:#d85a30;
+  --r:12px;
+}
+html,body{height:100%;background:#12121a;color:var(--tx);font-family:system-ui,sans-serif;overflow:hidden}
+#app{display:flex;flex-direction:column;height:100%;max-width:600px;margin:0 auto;position:relative}
+
+/* header */
+#hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px 6px;flex-shrink:0;
+}
+#hdr h1{font-size:15px;font-weight:700;line-height:1.2}
+#hdr .sub{font-size:11px;color:var(--txd)}
+#genbox{text-align:right}
+#genbox .gn{font-size:22px;font-weight:700;color:var(--ac)}
+#genbox .gl{font-size:11px;color:var(--txd)}
+
+/* canvas area */
+#cvwrap{flex:1;position:relative;overflow:hidden;min-height:0}
+canvas{display:block;width:100%;height:100%}
+#overlay{
+  position:absolute;bottom:8px;left:8px;right:8px;
+  display:flex;gap:6px;justify-content:center;pointer-events:none
+}
+.stat-chip{
+  background:rgba(28,28,36,.82);border:1px solid var(--bd);
+  border-radius:20px;padding:4px 12px;font-size:12px;
+  display:flex;gap:6px;align-items:center
+}
+.stat-chip .val{font-weight:700}
+.coop-val{color:var(--gr)}
+.defect-val{color:var(--rd)}
+
+/* action bar */
+#actbar{
+  display:flex;gap:8px;padding:8px 12px;flex-shrink:0;
+  background:var(--bg2);border-top:1px solid var(--bd)
+}
+.btn{
+  flex:1;padding:11px 4px;border:none;border-radius:8px;
+  font-size:14px;font-weight:600;cursor:pointer;
+  background:var(--bg3);color:var(--tx);transition:background .15s
+}
+.btn:active{background:#3a3a4a}
+.btn.primary{background:#2a6ac0;color:#fff}
+.btn.primary:active{background:#1f5295}
+.btn.danger{background:#4a2020}
+.btn.danger:active{background:#5a2828}
+
+/* tab bar */
+#tabbar{
+  display:flex;background:var(--bg2);border-top:1px solid var(--bd);
+  flex-shrink:0
+}
+.tab{
+  flex:1;padding:9px 4px 8px;text-align:center;
+  font-size:12px;font-weight:600;cursor:pointer;
+  border-bottom:2px solid transparent;color:var(--txd);transition:.15s
+}
+.tab.active{border-bottom-color:var(--ac);color:var(--ac)}
+
+/* tab panels */
+#panels{flex-shrink:0;max-height:42vh;overflow-y:auto;background:var(--bg2)}
+.panel{display:none;padding:12px}
+.panel.active{display:block}
+
+/* charts panel */
+#chart-canvas{width:100%;height:200px;display:block}
+
+/* params panel */
+.section{margin-bottom:14px}
+.section-title{font-size:11px;color:var(--txd);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.row label{font-size:13px;flex:1;min-width:0}
+.row .val-label{font-size:13px;font-weight:700;color:var(--ac);min-width:36px;text-align:right}
+
+input[type=range]{
+  -webkit-appearance:none;appearance:none;flex:0 0 130px;height:4px;
+  border-radius:2px;background:var(--bd);outline:none;cursor:pointer
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:22px;height:22px;border-radius:50%;
+  background:var(--ac);cursor:pointer
+}
+input[type=range]::-moz-range-thumb{
+  width:22px;height:22px;border-radius:50%;background:var(--ac);border:none;cursor:pointer
+}
+
+select{
+  background:var(--bg3);color:var(--tx);border:1px solid var(--bd);
+  border-radius:6px;padding:6px 8px;font-size:13px;flex:1;outline:none
+}
+
+/* population grid */
+#pop-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.pop-item{
+  background:var(--bg3);border:1px solid var(--bd);border-radius:8px;
+  padding:8px 10px;display:flex;align-items:center;gap:8px
+}
+.pop-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+.pop-info{flex:1;min-width:0}
+.pop-name{font-size:12px;font-weight:600}
+.pop-desc{font-size:10px;color:var(--txd)}
+.pop-cnt{font-size:14px;font-weight:700;color:var(--ac)}
+.pop-ctrl{display:flex;gap:4px}
+.pop-btn{
+  width:28px;height:28px;border:none;border-radius:6px;background:var(--bd);
+  color:var(--tx);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center
+}
+.pop-btn:active{background:#4a4a5a}
+
+/* payoff matrix */
+.matrix{display:grid;grid-template-columns:auto repeat(2,1fr);gap:4px;font-size:12px}
+.matrix .mhdr{text-align:center;color:var(--txd);padding:2px}
+.matrix .mlbl{color:var(--txd);display:flex;align-items:center;padding-right:4px}
+.matrix input[type=number]{
+  background:var(--bg3);border:1px solid var(--bd);border-radius:6px;
+  color:var(--tx);padding:6px;text-align:center;font-size:14px;font-weight:700;
+  width:100%;outline:none
+}
+.matrix input[type=number]:focus{border-color:var(--ac)}
+
+/* scrollbar */
+#panels::-webkit-scrollbar{width:3px}
+#panels::-webkit-scrollbar-track{background:transparent}
+#panels::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px}
+
+/* legend popup */
+#legend{
+  position:absolute;top:40px;left:8px;
+  background:rgba(28,28,36,.95);border:1px solid var(--bd);
+  border-radius:10px;padding:10px 12px;font-size:12px;
+  display:none;z-index:10;pointer-events:none;max-width:220px
+}
+#legend.show{display:block}
+.leg-row{display:flex;align-items:center;gap:7px;margin-bottom:4px}
+.leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hdr">
+    <div>
+      <h1>Дилемма Заключённого</h1>
+      <div class="sub">Эволюционный симулятор</div>
+    </div>
+    <div id="genbox">
+      <div class="gn" id="gen-num">0</div>
+      <div class="gl">поколение</div>
+    </div>
+  </div>
+
+  <div id="cvwrap">
+    <canvas id="cv"></canvas>
+    <div id="overlay">
+      <div class="stat-chip"><span>Кооп</span><span class="val coop-val" id="stat-coop">—</span></div>
+      <div class="stat-chip"><span>Предат</span><span class="val defect-val" id="stat-def">—</span></div>
+      <div class="stat-chip"><span>Лидер</span><span class="val" id="stat-leader">—</span></div>
+    </div>
+    <div id="legend"></div>
+  </div>
+
+  <div id="actbar">
+    <button class="btn" id="btn-step">Шаг</button>
+    <button class="btn primary" id="btn-run">▶ Запуск</button>
+    <button class="btn" id="btn-reset">⟳ Сброс</button>
+  </div>
+
+  <div id="tabbar">
+    <div class="tab active" data-tab="charts">Графики</div>
+    <div class="tab" data-tab="params">Параметры</div>
+    <div class="tab" data-tab="pop">Популяция</div>
+  </div>
+
+  <div id="panels">
+    <div class="panel active" id="panel-charts">
+      <canvas id="chart-canvas"></canvas>
+    </div>
+
+    <div class="panel" id="panel-params">
+      <div class="section">
+        <div class="section-title">Скорость и раунды</div>
+        <div class="row">
+          <label>Скорость (пок/с)</label>
+          <input type="range" id="sl-speed" min="1" max="20" value="2">
+          <span class="val-label" id="v-speed">2</span>
+        </div>
+        <div class="row">
+          <label>Раундов в поколении</label>
+          <input type="range" id="sl-rounds" min="3" max="50" value="20">
+          <span class="val-label" id="v-rounds">20</span>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Эволюция</div>
+        <div class="row">
+          <label>% замены худших</label>
+          <input type="range" id="sl-replace" min="1" max="50" value="10">
+          <span class="val-label" id="v-replace">10</span>
+        </div>
+        <div class="row">
+          <label>Шанс ошибки %</label>
+          <input type="range" id="sl-noise" min="0" max="30" value="2">
+          <span class="val-label" id="v-noise">2</span>
+        </div>
+        <div class="row">
+          <label>Мутация %</label>
+          <input type="range" id="sl-mutation" min="0" max="20" value="0">
+          <span class="val-label" id="v-mutation">0</span>
+        </div>
+        <div class="row">
+          <label>Механизм эволюции</label>
+          <select id="sel-evo">
+            <option>Elite Imitation</option>
+            <option>Probabilistic</option>
+          </select>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Топология сети</div>
+        <div class="row">
+          <label>Структура связей</label>
+          <select id="sel-topo">
+            <option>All-to-All</option>
+            <option>Ring</option>
+            <option>Random Graph</option>
+          </select>
+        </div>
+        <div class="row" id="row-ringk" style="display:none">
+          <label>Ring k (соседи)</label>
+          <input type="range" id="sl-ringk" min="1" max="8" value="2">
+          <span class="val-label" id="v-ringk">2</span>
+        </div>
+        <div class="row" id="row-density" style="display:none">
+          <label>Плотность графа %</label>
+          <input type="range" id="sl-density" min="5" max="95" value="30">
+          <span class="val-label" id="v-density">30</span>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Матрица выплат</div>
+        <div class="matrix">
+          <div></div>
+          <div class="mhdr">Он: Сотр.</div>
+          <div class="mhdr">Он: Предат.</div>
+          <div class="mlbl">Я: Сотр.</div>
+          <input type="number" id="ni-cc" value="3" min="-9" max="99">
+          <input type="number" id="ni-cd" value="0" min="-9" max="99">
+          <div class="mlbl">Я: Предат.</div>
+          <input type="number" id="ni-dc" value="5" min="-9" max="99">
+          <input type="number" id="ni-dd" value="1" min="-9" max="99">
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-pop">
+      <div class="section-title" style="margin-bottom:10px">Состав популяции — нажмите +/− для изменения</div>
+      <div id="pop-grid"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ─── CONSTANTS ─────────────────────────────────────────────────────────────
+const STRAT_COLORS = {
+  'АС':   '#1d9e75','АП':   '#d85a30','ОЗО':  '#378add',
+  'ОЗОР': '#7f77dd','ТОЗО': '#d45380','ГЛМ':  '#ba7517','СЧ':   '#888780',
+};
+const STRAT_FULL = {
+  'АС':  'Всегда сотрудничать',
+  'АП':  'Всегда предавать',
+  'ОЗО': 'Око за Око',
+  'ОЗОР':'ОЗО с реабилитацией',
+  'ТОЗО':'Терпеливое ОЗО',
+  'ГЛМ': 'Логика мести',
+  'СЧ':  'Случайная',
+};
+const STRAT_DESC = {
+  'АС':  'Стратегия всегда выбирает сотрудничество независимо от действий соперника.',
+  'АП':  'Стратегия всегда выбирает предательство независимо от действий соперника.',
+  'ОЗО': 'Стратегия «Око за Око». В первом раунде она выбирает сотрудничество, а затем повторяет последнее действие соперника: на сотрудничество отвечает сотрудничеством, на предательство — предательством.',
+  'ОЗОР':'ОЗО с реабилитацией. Стратегия повторяет последнее действие соперника, но после его предательства с небольшой вероятностью может снова выбрать сотрудничество.',
+  'ТОЗО':'Терпеливое ОЗО. Стратегия не наказывает за первое предательство, но если соперник предаёт два раза подряд, начинает отвечать предательством.',
+  'ГЛМ': 'Стратегия с логикой мести. Сначала она сотрудничает, но если соперник хотя бы один раз предал, стратегия запоминает это и в дальнейшем всегда выбирает предательство против данного соперника.',
+  'СЧ':  'Случайная стратегия. На каждом ходе она выбирает сотрудничество или предательство с вероятностью 50 % для каждого варианта.',
+};
+const ALL_STRATS = ['АС','АП','ОЗО','ОЗОР','ТОЗО','ГЛМ','СЧ'];
+const DEFAULT_COMP = {ОЗО:6,ОЗОР:3,ТОЗО:3,АС:2,АП:3,ГЛМ:1};
+
+// ─── SIMULATION ────────────────────────────────────────────────────────────
+function decide(player, oppId, noise) {
+  const h = player.hist[oppId] || [];
+  let act;
+  switch(player.strat) {
+    case 'АС': act = 'C'; break;
+    case 'АП': act = 'D'; break;
+    case 'ОЗО': act = h.length ? h[h.length-1] : 'C'; break;
+    case 'ОЗОР':
+      act = (!h.length) ? 'C' : (h[h.length-1]==='D' ? (Math.random()<.1?'C':'D') : 'C'); break;
+    case 'ТОЗО': {
+      if (!h.length) { act='C'; break; }
+      if (h[h.length-1]==='D') {
+        player.memory[oppId] = (player.memory[oppId]||0)+1;
+        act = player.memory[oppId]>=2 ? 'D' : 'C';
+      } else { player.memory[oppId]=0; act='C'; }
+      break;
+    }
+    case 'ГЛМ':
+      if (player.memory[oppId]==='betrayed') act='D';
+      else if (h.length && h[h.length-1]==='D') { player.memory[oppId]='betrayed'; act='D'; }
+      else act='C';
+      break;
+    default: act = Math.random()<.5?'C':'D';
+  }
+  if (noise>0 && Math.random()<noise) act = act==='C'?'D':'C';
+  return act;
+}
+
+function buildAdj(n, topo, ringK, density) {
+  const adj = Array.from({length:n},()=>[]);
+  if (topo==='All-to-All') {
+    for (let i=0;i<n;i++) for (let j=0;j<n;j++) if(i!==j) adj[i].push(j);
+  } else if (topo==='Ring') {
+    const k = Math.max(1, Math.min(ringK, Math.floor((n-1)/2)));
+    for (let i=0;i<n;i++) for (let d=1;d<=k;d++) {
+      const j=(i+d)%n;
+      if(!adj[i].includes(j)) adj[i].push(j);
+      if(!adj[j].includes(i)) adj[j].push(i);
+    }
+  } else {
+    const p = density/100;
+    for (let i=0;i<n;i++) for (let j=i+1;j<n;j++) if(Math.random()<p) {
+      adj[i].push(j); adj[j].push(i);
+    }
+    for (let i=0;i<n;i++) if(!adj[i].length) {
+      const j=(i+1)%n; adj[i].push(j); adj[j].push(i);
+    }
+  }
+  return adj;
+}
+
+class Sim {
+  constructor() {
+    this.players = [];
+    this.generation = 0;
+    this.roundsPerGen = 20;
+    this.replacePct = 0.10;
+    this.noise = 0.02;
+    this.mutation = 0;
+    this.topology = 'All-to-All';
+    this.ringK = 2;
+    this.density = 30;
+    this.evoMode = 'Elite Imitation';
+    this.payoff = {cc:3,cd:0,dc:5,dd:1};
+    this.adj = [];
+    this.flashEdges = [];
+    this.popHistory = [];
+    this.coopHistory = [];
+    this.scoreHistory = [];
+    this.init();
+  }
+  init(comp=DEFAULT_COMP) {
+    this.players = [];
+    for (const [s,cnt] of Object.entries(comp)) {
+      for (let i=0;i<cnt;i++) {
+        this.players.push({pid:this.players.length,strat:s,score:0,hist:{},memory:{},x:0,y:0,vr:10});
+      }
+    }
+    this.generation=0; this.popHistory=[]; this.coopHistory=[]; this.scoreHistory=[]; this.flashEdges=[]; this.adj=[];
+    this.placeAll();
+  }
+  placeAll(cx,cy,maxR) {
+    const n=this.players.length; if(!n) return;
+    const R = Math.min(maxR||999, Math.min(280, Math.max(100, 28*Math.pow(n,.6))));
+    if(!cx) cx=0; if(!cy) cy=0;
+    for (let i=0;i<n;i++) {
+      const a=(i/n)*Math.PI*2 - Math.PI/2;
+      this.players[i].x = cx + R*Math.cos(a);
+      this.players[i].y = cy + R*Math.sin(a);
+    }
+  }
+  step() {
+    const {players,payoff} = this;
+    players.forEach(p=>{p.score=0;p.hist={};p.memory={};});
+    const n=players.length; if(!n) return;
+    this.adj = buildAdj(n, this.topology, this.ringK, this.density);
+    let totalActs=0,coopActs=0;
+    const newEdges=[];
+    for (let r=0;r<this.roundsPerGen;r++) {
+      const played=new Set();
+      for (let i=0;i<n;i++) {
+        for (const j of this.adj[i]) {
+          if(j<=i) continue;
+          const key=i*10000+j;
+          if(played.has(key)) continue;
+          played.add(key);
+          const pi=players[i], pj=players[j];
+          if(!pi.hist[j]) pi.hist[j]=[];
+          if(!pj.hist[i]) pj.hist[i]=[];
+          const ai=decide(pi,j,this.noise);
+          const aj=decide(pj,i,this.noise);
+          pi.hist[j].push(aj); pj.hist[i].push(ai);
+          totalActs+=2;
+          if(ai==='C') coopActs++;
+          if(aj==='C') coopActs++;
+          const key2=(ai==='C'?'c':'d')+(aj==='C'?'c':'d');
+          const key3=(aj==='C'?'c':'d')+(ai==='C'?'c':'d');
+          pi.score+=payoff[key2]; pj.score+=payoff[key3];
+          if(r===this.roundsPerGen-1) newEdges.push([i,j,STRAT_COLORS[pi.strat]]);
+        }
+      }
+    }
+    this._evolve();
+    if (this.mutation>0) players.forEach(p=>{ if(Math.random()<this.mutation) p.strat=ALL_STRATS[Math.floor(Math.random()*ALL_STRATS.length)]; });
+    const snap={}; players.forEach(p=>{ snap[p.strat]=(snap[p.strat]||0)+1; });
+    this.popHistory.push(snap); if(this.popHistory.length>120) this.popHistory.shift();
+    const coop = totalActs>0 ? coopActs/totalActs : 0;
+    this.coopHistory.push(coop); if(this.coopHistory.length>120) this.coopHistory.shift();
+    const avg = players.reduce((s,p)=>s+p.score,0)/n;
+    this.scoreHistory.push(avg); if(this.scoreHistory.length>120) this.scoreHistory.shift();
+    this.generation++;
+    this.flashEdges = newEdges;
+  }
+  _evolve() {
+    const players=this.players, n=players.length; if(n<2) return;
+    const sorted=[...players].sort((a,b)=>b.score-a.score);
+    const nReplace=Math.max(1,Math.round(n*this.replacePct));
+    if (this.evoMode==='Elite Imitation') {
+      const topN=Math.max(1,Math.round(n*.25));
+      const tops=sorted.slice(0,topN);
+      const losers=sorted.slice(n-nReplace);
+      losers.forEach(l=>{ l.strat=tops[Math.floor(Math.random()*tops.length)].strat; });
+    } else {
+      const losers=sorted.slice(n-nReplace);
+      const scores=players.map(p=>p.score);
+      const range=Math.max(...scores)-Math.min(...scores);
+      if(!range) return;
+      losers.forEach(l=>{
+        const cands=players.filter(p=>p.pid!==l.pid&&p.score>l.score);
+        if(!cands.length) return;
+        const t=cands[Math.floor(Math.random()*cands.length)];
+        if(Math.random()<(t.score-l.score)/range) l.strat=t.strat;
+      });
+    }
+  }
+}
+
+// ─── APP ───────────────────────────────────────────────────────────────────
+const sim = new Sim();
+let running=false, rafId=null, lastTime=0, frameAcc=0;
+
+// canvas
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const chartCv = document.getElementById('chart-canvas');
+const chartCtx = chartCv.getContext('2d');
+let flashAlpha=0;
+
+function resizeCanvas() {
+  const wrap = document.getElementById('cvwrap');
+  const dpr = window.devicePixelRatio||1;
+  const w=wrap.clientWidth, h=wrap.clientHeight;
+  cv.width=w*dpr; cv.height=h*dpr;
+  cv.style.width=w+'px'; cv.style.height=h+'px';
+  ctx.scale(dpr,dpr);
+  sim.placeAll(w/2, h/2, Math.min(w,h)/2-30);
+  drawFrame();
+}
+
+function hexToRgb(hex) {
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return {r,g,b};
+}
+
+function drawFrame() {
+  const wrap = document.getElementById('cvwrap');
+  const W=wrap.clientWidth, H=wrap.clientHeight;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#12121a';
+  ctx.fillRect(0,0,W,H);
+
+  const players=sim.players, n=players.length;
+  if(!n) return;
+  const adj=sim.adj;
+
+  // draw edges
+  ctx.save();
+  if (adj.length) {
+    const drawn=new Set();
+    for (let i=0;i<n;i++) {
+      for (const j of (adj[i]||[])) {
+        const key=Math.min(i,j)*10000+Math.max(i,j);
+        if(drawn.has(key)) continue;
+        drawn.add(key);
+        ctx.strokeStyle='rgba(80,80,100,0.2)';
+        ctx.lineWidth=1;
+        ctx.beginPath();
+        ctx.moveTo(players[i].x,players[i].y);
+        ctx.lineTo(players[j].x,players[j].y);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // flash edges
+  if (flashAlpha>0) {
+    for (const [i,j,col] of sim.flashEdges) {
+      if(i>=n||j>=n) continue;
+      const {r,g,b}=hexToRgb(col);
+      ctx.strokeStyle=`rgba(${r},${g},${b},${flashAlpha*0.18})`;
+      ctx.lineWidth=1.5;
+      ctx.beginPath();
+      ctx.moveTo(players[i].x,players[i].y);
+      ctx.lineTo(players[j].x,players[j].y);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  // draw nodes
+  const maxScore = Math.max(...players.map(p=>p.score),1)||1;
+  players.forEach(p=>{
+    const target = 7+(p.score/maxScore)*5;
+    p.vr += (target-p.vr)*0.15;
+    const r=p.vr, {x,y}=p;
+    const col=STRAT_COLORS[p.strat];
+    const {r:cr,g:cg,b:cb}=hexToRgb(col);
+
+    // glow
+    const grd=ctx.createRadialGradient(x,y,r*0.5,x,y,r*2.2);
+    grd.addColorStop(0,`rgba(${cr},${cg},${cb},0.3)`);
+    grd.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.beginPath(); ctx.arc(x,y,r*2.2,0,Math.PI*2);
+    ctx.fillStyle=grd; ctx.fill();
+
+    // circle
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fillStyle=col; ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1; ctx.stroke();
+
+    // label
+    ctx.font='bold 11px system-ui';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    const lw=ctx.measureText(p.strat).width+8;
+    ctx.fillStyle='rgba(18,18,26,0.75)';
+    ctx.beginPath();
+    ctx.roundRect(x-lw/2, y-r-16, lw, 14, 3);
+    ctx.fill();
+    ctx.fillStyle=col;
+    ctx.fillText(p.strat, x, y-r-9);
+  });
+
+  // generation label
+  ctx.font='bold 13px system-ui';
+  ctx.fillStyle='rgba(80,160,230,0.7)';
+  ctx.textAlign='left'; ctx.textBaseline='top';
+  ctx.fillText(sim.topology, 10, 10);
+}
+
+function drawCharts() {
+  const dpr=window.devicePixelRatio||1;
+  const W=chartCv.clientWidth;
+  if (!W) return; // panel hidden — skip to avoid zeroing the canvas buffer
+  const H=200;
+  chartCv.width=W*dpr; chartCv.height=H*dpr;
+  chartCv.style.width=W+'px'; chartCv.style.height=H+'px';
+  chartCtx.scale(dpr,dpr);
+
+  chartCtx.fillStyle='#1c1c24';
+  chartCtx.fillRect(0,0,W,H);
+
+  const hist=sim.popHistory, coop=sim.coopHistory;
+  // Layout: PAD(8) | H1=86 strat chart | leg=12 | gap=4 | title=12 | H2=62 coop chart | leg=12 | PAD(4)
+  const PAD=8, LABEL_W=26;
+  const GW = W - PAD*2 - LABEL_W; // line drawing width (leave right margin for count labels)
+  const H1=86, LEG=12, GAP=4, TITLE=12, H2=60;
+  const CY1=PAD;           // strategy chart top
+  const CY_LEG=CY1+H1+2;  // strategy legend
+  const CY2=CY_LEG+LEG+GAP+TITLE; // coop chart top  (= 8+86+2+12+4+12 = 124)
+
+  // ── strategy chart ──
+  chartCtx.strokeStyle='rgba(58,58,74,0.6)'; chartCtx.lineWidth=1;
+  for (let k=0;k<=4;k++) {
+    const y=CY1+H1-k*H1/4;
+    chartCtx.beginPath(); chartCtx.moveTo(PAD,y); chartCtx.lineTo(PAD+GW+LABEL_W,y); chartCtx.stroke();
+  }
+
+  if (hist.length>1) {
+    const steps=hist.length;
+    const n=sim.players.length||1;
+    const active=ALL_STRATS.filter(s=>hist.some(h=>h[s]>0));
+    active.forEach(s=>{
+      const col=STRAT_COLORS[s];
+      chartCtx.strokeStyle=col; chartCtx.lineWidth=2;
+      chartCtx.beginPath();
+      hist.forEach((h,i)=>{
+        const x=PAD+i/(steps-1)*GW;
+        const y=CY1+H1-(h[s]||0)/n*H1;
+        i===0?chartCtx.moveTo(x,y):chartCtx.lineTo(x,y);
+      });
+      chartCtx.stroke();
+      const last=hist[hist.length-1];
+      const cnt=last[s]||0;
+      if (cnt>0) {
+        const x=PAD+GW, y=CY1+H1-cnt/n*H1;
+        chartCtx.beginPath(); chartCtx.arc(x,y,3,0,Math.PI*2);
+        chartCtx.fillStyle=col; chartCtx.fill();
+        // count label to the right
+        chartCtx.font='bold 10px system-ui';
+        chartCtx.textAlign='left'; chartCtx.textBaseline='middle';
+        chartCtx.fillStyle=col;
+        chartCtx.fillText(cnt, x+5, y);
+      }
+    });
+  }
+
+  // strategy legend
+  const active2=ALL_STRATS.filter(s=>hist.length&&(hist[hist.length-1][s]||0)>0);
+  let lx=PAD;
+  chartCtx.font='10px system-ui'; chartCtx.textBaseline='top';
+  active2.forEach(s=>{
+    const col=STRAT_COLORS[s];
+    chartCtx.fillStyle=col;
+    chartCtx.fillRect(lx, CY_LEG, 8, 8);
+    chartCtx.fillStyle='rgba(180,180,170,0.7)';
+    chartCtx.fillText(s, lx+11, CY_LEG);
+    lx += chartCtx.measureText(s).width+24;
+  });
+
+  // ── cooperation chart ──
+  chartCtx.strokeStyle='rgba(58,58,74,0.6)'; chartCtx.lineWidth=1;
+  [0,.5,1].forEach(k=>{
+    const y=CY2+H2-k*H2;
+    chartCtx.beginPath(); chartCtx.moveTo(PAD,y); chartCtx.lineTo(PAD+GW+LABEL_W,y); chartCtx.stroke();
+  });
+
+  if (coop.length>1) {
+    const steps=coop.length;
+    // coop line
+    chartCtx.strokeStyle='#32c878'; chartCtx.lineWidth=2;
+    chartCtx.beginPath();
+    coop.forEach((v,i)=>{
+      const x=PAD+i/(steps-1)*GW, y=CY2+H2-v*H2;
+      i===0?chartCtx.moveTo(x,y):chartCtx.lineTo(x,y);
+    });
+    chartCtx.stroke();
+    // defect line
+    chartCtx.strokeStyle='#d85a30'; chartCtx.lineWidth=2;
+    chartCtx.beginPath();
+    coop.forEach((v,i)=>{
+      const x=PAD+i/(steps-1)*GW, y=CY2+H2-(1-v)*H2;
+      i===0?chartCtx.moveTo(x,y):chartCtx.lineTo(x,y);
+    });
+    chartCtx.stroke();
+    // endpoint value labels
+    const lv=coop[coop.length-1];
+    chartCtx.font='bold 11px system-ui'; chartCtx.textAlign='left'; chartCtx.textBaseline='middle';
+    chartCtx.fillStyle='#32c878';
+    chartCtx.fillText(`${(lv*100).toFixed(0)}%`, PAD+GW+4, CY2+H2-lv*H2);
+    chartCtx.fillStyle='#d85a30';
+    chartCtx.fillText(`${((1-lv)*100).toFixed(0)}%`, PAD+GW+4, CY2+H2-(1-lv)*H2);
+  }
+
+  // coop legend
+  const coopLegY=CY2+H2+4;
+  chartCtx.font='10px system-ui'; chartCtx.textBaseline='top'; chartCtx.textAlign='left';
+  chartCtx.fillStyle='#32c878'; chartCtx.fillRect(PAD, coopLegY, 8, 8);
+  chartCtx.fillStyle='rgba(180,180,170,0.7)'; chartCtx.fillText('Кооперация', PAD+11, coopLegY);
+  chartCtx.fillStyle='#d85a30'; chartCtx.fillRect(PAD+100, coopLegY, 8, 8);
+  chartCtx.fillStyle='rgba(180,180,170,0.7)'; chartCtx.fillText('Предательство', PAD+111, coopLegY);
+
+  // section titles
+  chartCtx.font='10px system-ui'; chartCtx.textAlign='left'; chartCtx.textBaseline='top';
+  chartCtx.fillStyle='rgba(120,120,112,0.7)';
+  chartCtx.fillText('Стратегии', PAD, CY1);
+  chartCtx.fillText('Кооперация / Предательство', PAD, CY2-TITLE+1);
+}
+
+// ─── STATS UPDATE ──────────────────────────────────────────────────────────
+function updateStats() {
+  document.getElementById('gen-num').textContent = sim.generation;
+  const coop = sim.coopHistory[sim.coopHistory.length-1];
+  if (coop!=null) {
+    document.getElementById('stat-coop').textContent = (coop*100).toFixed(0)+'%';
+    document.getElementById('stat-def').textContent  = ((1-coop)*100).toFixed(0)+'%';
+  }
+  if (sim.players.length) {
+    const best = sim.players.reduce((a,b)=>a.score>b.score?a:b);
+    document.getElementById('stat-leader').textContent = best.strat;
+  }
+}
+
+// ─── POPULATION PANEL ──────────────────────────────────────────────────────
+function buildPopGrid() {
+  const grid=document.getElementById('pop-grid');
+  const counts={};
+  sim.players.forEach(p=>{ counts[p.strat]=(counts[p.strat]||0)+1; });
+  grid.innerHTML='';
+  ALL_STRATS.forEach(s=>{
+    const cnt=counts[s]||0;
+    const div=document.createElement('div');
+    div.className='pop-item';
+    div.innerHTML=`
+      <div class="pop-dot" style="background:${STRAT_COLORS[s]}"></div>
+      <div class="pop-info" onclick="showStratModal('${s}')" style="cursor:pointer;flex:1">
+        <div class="pop-name">${s} <span style="font-size:10px;opacity:0.45">ⓘ</span></div>
+        <div class="pop-desc">${STRAT_FULL[s]}</div>
+      </div>
+      <div class="pop-ctrl">
+        <button class="pop-btn" data-strat="${s}" data-d="-1">−</button>
+        <span class="pop-cnt" id="pc-${s}">${cnt}</span>
+        <button class="pop-btn" data-strat="${s}" data-d="1">+</button>
+      </div>`;
+    grid.appendChild(div);
+  });
+  grid.querySelectorAll('.pop-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const s=btn.dataset.strat, d=+btn.dataset.d;
+      const cur=(counts[s]||0)+d;
+      if(cur<0) return;
+      if(d>0) {
+        const pid=sim.players.length>0?Math.max(...sim.players.map(p=>p.pid))+1:0;
+        sim.players.push({pid,strat:s,score:0,hist:{},memory:{},x:0,y:0,vr:10});
+      } else {
+        const idx=sim.players.findLastIndex(p=>p.strat===s);
+        if(idx>=0) sim.players.splice(idx,1);
+      }
+      sim.adj=[]; sim.flashEdges=[];
+      resizeCanvas();
+      buildPopGrid();
+    });
+  });
+}
+
+// ─── MAIN LOOP ──────────────────────────────────────────────────────────────
+function mainLoop(ts) {
+  rafId = requestAnimationFrame(mainLoop);
+  const dt=Math.min((ts-lastTime)/1000, 0.1);
+  lastTime=ts;
+
+  if (flashAlpha>0) flashAlpha=Math.max(0,flashAlpha-6*dt);
+
+  if (running) {
+    const speed=+document.getElementById('sl-speed').value;
+    frameAcc+=dt;
+    const interval=1/Math.max(1,speed);
+    while(frameAcc>=interval) {
+      frameAcc-=interval;
+      syncParams();
+      sim.step();
+      flashAlpha=1;
+      updateStats();
+    }
+  }
+
+  drawFrame();
+  if (document.querySelector('.tab[data-tab="charts"].active')) drawCharts();
+}
+
+function syncParams() {
+  sim.roundsPerGen = +document.getElementById('sl-rounds').value;
+  sim.replacePct   = +document.getElementById('sl-replace').value/100;
+  sim.noise        = +document.getElementById('sl-noise').value/100;
+  sim.mutation     = +document.getElementById('sl-mutation').value/100;
+  sim.topology     = document.getElementById('sel-topo').value;
+  sim.ringK        = +document.getElementById('sl-ringk').value;
+  sim.density      = +document.getElementById('sl-density').value;
+  sim.evoMode      = document.getElementById('sel-evo').value==='Elite Imitation' ? 'Elite Imitation' : 'Probabilistic Imitation';
+  sim.payoff = {
+    cc: +document.getElementById('ni-cc').value||3,
+    cd: +document.getElementById('ni-cd').value||0,
+    dc: +document.getElementById('ni-dc').value||5,
+    dd: +document.getElementById('ni-dd').value||1,
+  };
+}
+
+// ─── BUTTONS ───────────────────────────────────────────────────────────────
+document.getElementById('btn-step').addEventListener('click',()=>{
+  syncParams(); sim.step(); flashAlpha=1; updateStats(); drawCharts();
+});
+
+document.getElementById('btn-run').addEventListener('click',()=>{
+  running=!running;
+  document.getElementById('btn-run').textContent = running ? '⏸ Пауза' : '▶ Запуск';
+  document.getElementById('btn-run').className   = running ? 'btn danger' : 'btn primary';
+  frameAcc=0;
+});
+
+document.getElementById('btn-reset').addEventListener('click',()=>{
+  running=false;
+  document.getElementById('btn-run').textContent='▶ Запуск';
+  document.getElementById('btn-run').className='btn primary';
+  sim.init();
+  updateStats();
+  resizeCanvas();
+  drawCharts();
+  buildPopGrid();
+});
+
+// ─── SLIDERS ───────────────────────────────────────────────────────────────
+[['sl-speed','v-speed'],['sl-rounds','v-rounds'],['sl-replace','v-replace'],
+ ['sl-noise','v-noise'],['sl-mutation','v-mutation'],['sl-ringk','v-ringk'],['sl-density','v-density']
+].forEach(([id,vid])=>{
+  const el=document.getElementById(id);
+  const vl=document.getElementById(vid);
+  if(el&&vl) el.addEventListener('input',()=>{ vl.textContent=el.value; });
+});
+
+document.getElementById('sel-topo').addEventListener('change',function(){
+  document.getElementById('row-ringk').style.display   = this.value==='Ring'         ?'flex':'none';
+  document.getElementById('row-density').style.display = this.value==='Random Graph' ?'flex':'none';
+});
+
+// ─── TABS ───────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-'+tab.dataset.tab).classList.add('active');
+    if(tab.dataset.tab==='charts') drawCharts();
+    if(tab.dataset.tab==='pop') buildPopGrid();
+  });
+});
+
+// ─── INIT ───────────────────────────────────────────────────────────────────
+window.addEventListener('resize',resizeCanvas);
+resizeCanvas();
+updateStats();
+buildPopGrid();
+drawCharts();
+requestAnimationFrame(ts=>{ lastTime=ts; mainLoop(ts); });
+</script>
+<!-- Strategy info modal -->
+<div id="strat-modal" style="display:none;position:fixed;inset:0;z-index:200;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,0.55);backdrop-filter:blur(3px)">
+  <div style="background:#1a1a2e;border:1px solid rgba(255,255,255,0.12);border-radius:14px;max-width:360px;width:100%;padding:20px 20px 16px;box-shadow:0 8px 32px rgba(0,0,0,0.6)">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <div id="sm-dot" style="width:14px;height:14px;border-radius:50%;flex-shrink:0"></div>
+      <div>
+        <div id="sm-abbr" style="font-size:11px;color:rgba(180,180,200,0.6);letter-spacing:.05em"></div>
+        <div id="sm-name" style="font-weight:700;font-size:16px;color:#e8e8f0"></div>
+      </div>
+    </div>
+    <p id="sm-desc" style="font-size:14px;line-height:1.6;color:rgba(200,200,220,0.85);margin:0 0 16px"></p>
+    <button id="sm-close" style="width:100%;padding:9px;border:none;border-radius:8px;background:rgba(255,255,255,0.08);color:#c8c8e0;font-size:14px;cursor:pointer">Закрыть</button>
+  </div>
+</div>
+
+<script>
+(()=>{
+  const modal = document.getElementById('strat-modal');
+  document.getElementById('sm-close').addEventListener('click', ()=>{ modal.style.display='none'; });
+  modal.addEventListener('click', e=>{ if(e.target===modal) modal.style.display='none'; });
+
+  window.showStratModal = function(s) {
+    document.getElementById('sm-dot').style.background = STRAT_COLORS[s];
+    document.getElementById('sm-abbr').textContent = s;
+    document.getElementById('sm-name').textContent = STRAT_FULL[s];
+    document.getElementById('sm-desc').textContent = STRAT_DESC[s];
+    modal.style.display = 'flex';
+  };
+})();
+</script>
+</body>
+</html>
