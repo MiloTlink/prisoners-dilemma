@@ -12,7 +12,7 @@
   --r:12px;
 }
 html,body{height:100%;width:100%;max-width:100vw;background:#12121a;color:var(--tx);font-family:system-ui,sans-serif;overflow:hidden}
-#app{display:flex;flex-direction:column;height:100%;width:100%;max-width:600px;margin:0 auto;position:relative;overflow:hidden}
+#app{display:flex;flex-direction:column;height:100%;width:100%;margin:0 auto;position:relative;overflow:hidden}
 
 /* header */
 #hdr{
@@ -154,7 +154,6 @@ select{
    short phone OR tall-but-wide window — uses the horizontal space instead
    of leaving empty margins around a narrow centred column. */
 @media (min-aspect-ratio: 4/3) {
-  #app{max-width:none}
   #body-row{flex-direction:row}
   #cvwrap{flex:0 0 44%;min-width:0}
   #right-col{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;overflow:hidden;border-left:1px solid var(--bd)}
